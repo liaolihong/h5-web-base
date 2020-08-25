@@ -1,0 +1,64 @@
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  font-size: 16px;
+  background-color: #fff !important;
+  color: rgba(0, 0, 0, 0.65);
+  -webkit-text-size-adjust: 100%;
+  box-sizing: border-box;
+}
+body {
+  margin: auto !important;
+  width: 100%;
+}
+* {
+  box-sizing: border-box;
+}
+
+.fl {
+  float: left;
+}
+
+.fr {
+  float: right;
+}
+
+.clearfix:after {
+  clear: both;
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+}
+
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+::-webkit-input-placeholder {
+  color: #878d99;
+}
+
+:-moz-placeholder {
+  color: #878d99;
+}
+
+::-moz-placeholder {
+  color: #878d99;
+}
+
+:-ms-input-placeholder {
+  color: #878d99;
+}
+
+/* 剩余滚动条样式 */
+
+::-webkit-scrollbar-track-piece {
+  width: 2px;
+  background-color: rgba(255, 255, 255, 1) !important;
+}

@@ -1,0 +1,115 @@
+pipeline {
+  agent {
+  	docker {
+  		image 'reg.watone.local/library/yarn:v1.22.4'
+  		args '-v /usr/bin/docker:/usr/bin/docker -v /var/run/docker.sock:/var/run/docker.sock'
+  	}
+  }
+
+  stages {
+    stage('Git Checkout'){
+        steps {
+            checkout([$class: 'GitSCM', branches: [[name: "$BRANCHES"]], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: 'df5d99a0-9b4f-4ac1-aaaa-6e0865e0cd67', url: 'git@47.111.5.200:qqzx/linan017-h5.git']]])
+        }
+    }
+
+    stage('Yarn Build'){
+        // agent { docker 'reg.watone.local/library/yarn:v1.22.4' }
+        steps {
+            sh '''
+            yarn install
+            yarn build
+            '''
+        }
+    }
+
+    stage('Docker build') {
+        // 判断条件为真
+        when {
+            anyOf {
+                environment name: 'REGISTRY_A', value: 'reg.watone.local'
+                environment name: 'REGISTRY_B', value: 'registry.citybrain.local'
+            }
+        }
+        failFast true
+        // 并行构建、推送Docker镜像到不同的镜像仓库
+        parallel {
+            stage(A) {
+                steps {
+                    // echo "[JOB_BASE_NAME] :${env.JOB_BASE_NAME}"
+                    sh '''
+                    echo "构建镜像: ${REGISTRY_A} 仓库！！！"
+                    docker build -t ${REGISTRY_A}/${PROJECT_NAME}/${IMAGE_NAME}:${VERSION} -f dockerfile .
+
+                    '''
+                }
+            }
+
+            stage(B) {
+                steps {
+                    // echo "[JOB_BASE_NAME] :${env.JOB_BASE_NAME}"
+                    // REGISTRY-B: 镜像仓库地址URL(reg.citybrain.local)
+                    // PROJECT_NAME: 镜像项目名称(gcylab)
+                    // JOB_BASE_NAME: 工程名称(cblab-gateway)
+                    // VERSION: 镜像版本TAG(1.0.0)
+                    // `ls target/*.jar |cut -d '/' -f2`: 获取jar包名称
+
+                    sh '''
+                    echo "构建镜像: ${REGISTRY_B} 仓库！！！"
+                    docker build -t ${REGISTRY_B}/${PROJECT_NAME}/${IMAGE_NAME}:${VERSION} -f dockerfile .
+
+                    '''
+                }
+            }
+        }
+    }
+
+    stage('docker push') {
+        steps {
+            sh '''
+            echo "推送镜像到: ${REGISTRY_A} 仓库！！！"
+            docker login -u ${ACCOUNT_A} -p ${PASSWD_A} ${REGISTRY_A}
+            docker push ${REGISTRY_A}/${PROJECT_NAME}/${IMAGE_NAME}:${VERSION}
+            '''
+            sleep 5
+            sh '''
+            echo "推送镜像到: ${REGISTRY_B} 仓库！！！"
+            docker login -u ${ACCOUNT_B} -p ${PASSWD_B} ${REGISTRY_B}
+            docker push ${REGISTRY_B}/${PROJECT_NAME}/${IMAGE_NAME}:${VERSION}
+            '''
+        }
+    }
+
+    // stage('Deploy to k8s') {
+    //     steps {
+    //         script {
+    //             if ( PROFILES == 'test' ) {
+    //                 echo '接下来进行测试项目的发布...'
+    //                 sh '''
+    //                 sed -i "/image/{s/latest/${VERSION}/}"  deploy.yaml
+    //                 sed -i "/PROFILES/{s/PROFILES/${PROFILES}/}"  deploy.yaml
+    //                 '''
+    //                 kubernetesDeploy configs: 'deploy.yaml', kubeConfig: [path: ''], kubeconfigId: '5bcd4a8a-3601-41ce-8bb8-e5851d67ad9a', secretName: '', ssh: [sshCredentialsId: '*', sshServer: ''], textCredentials: [certificateAuthorityData: '', clientCertificateData: '', clientKeyData: '', serverUrl: 'https://']
+    //             }
+
+    //             if ( PROFILES == 'pre' ) {
+    //                 echo '接下来进行预发项目的发布...'
+    //                 sh '''
+    //                 sed -i "/image/{s/latest/${VERSION}/}"  deploy.yaml
+    //                 sed -i "/PROFILES/{s/PROFILES/${PROFILES}/}"  deploy.yaml
+    //                 '''
+    //                 kubernetesDeploy configs: 'deploy.yaml', kubeConfig: [path: ''], kubeconfigId: '5bcd4a8a-3601-41ce-8bb8-e5851d67ad9a', secretName: '', ssh: [sshCredentialsId: '*', sshServer: ''], textCredentials: [certificateAuthorityData: '', clientCertificateData: '', clientKeyData: '', serverUrl: 'https://']
+    //             }
+    //         }
+    //     }
+    // }
+
+    stage ('Post-Build') {
+        steps {
+            script {
+                currentBuild.description = "${VERSION}"
+            }
+        }
+    }
+  }
+}
